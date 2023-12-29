@@ -5,6 +5,7 @@ $(function () {
     let pagination = $('#pagination');
     let currentPage = 1;
     let entriesPerPage = parseInt($('#select').val());
+    let searchInput = $("#search")
     $.ajax({
         url: jsonFilePath,
         dataType: 'json',
@@ -14,35 +15,56 @@ $(function () {
             displayTable();
         }
     });
-    const displayTable = () => {
+    const filterData = (searchTerm) => {
+        return data.data.filter(row => {
+            return Object.values(row).some(value => {
+                return String(value).toLowerCase().includes(searchTerm.toLowerCase());
+            });
+        });
+    };
+
+    searchInput.on('input', () => {
+        const searchTerm = searchInput.val();
+        const filteredData = filterData(searchTerm);
+        console.log(filteredData);
+        currentPage = 1;
+        displayTable(filteredData);
+        updatePagination(filteredData);
+    });
+    const displayTable = (rowData = data.data) => {
         tableBody.empty(); 
         let start = (currentPage - 1) * entriesPerPage;
-        let end = start + entriesPerPage > data.data.length ? data.data.length : start + entriesPerPage;
-        if (start > data.data.length) {
-            currentPage = Math.ceil(data.data.length / entriesPerPage);
+        let end = start + entriesPerPage > rowData.length ? rowData.length : start + entriesPerPage;
+        if (start > rowData.length) {
+            currentPage = Math.ceil(rowData.length / entriesPerPage);
             start = (currentPage - 1) * entriesPerPage;
         }
-        let dataRows = data.data.slice(start, end);
-        $.each(dataRows, function (index, row) {
-            let tableRow = $('<tr></tr>');
-            $.each(row, function (index, column) {
-                let tableCell = $('<td></td>').text(column);
-                tableRow.append(tableCell);
-            });
-            tableBody.append(tableRow);
-        });
-        showEntriesInfo(currentPage, entriesPerPage, data.data.length);
-        updatePagination();
+        let dataRows = rowData.slice(start, end);
+        for (let i = 0; i < dataRows.length; i++) {
+            let row = dataRows[i];
+            let tableRow = document.createElement('tr');
+    
+            for (let j = 0; j < row.length; j++) {
+                let column = row[j];
+                let tableCell = document.createElement('td');
+                tableCell.textContent = column;
+                tableRow.appendChild(tableCell);
+            }
+    
+            tableBody[0].appendChild(tableRow);
+        }
+        showEntriesInfo(currentPage, entriesPerPage, rowData.length);
+        updatePagination(rowData);
     };
-    const updatePagination = () => {
+    const updatePagination = (rowData = data.data) => {
         pagination.empty();
-        let totalPages = Math.ceil(data.data.length / entriesPerPage);
+        let totalPages = Math.ceil(rowData.length / entriesPerPage);
         if (totalPages > 0 && currentPage <= totalPages) {
             let prevButton = $("<li class='pagination-btn prev'><a href='#'>Previous</a></li>");
             $(prevButton).click(() => {
                 if (currentPage > 1) {
                     currentPage--;
-                    displayTable();
+                    displayTable(rowData);
                 }
             });
             if (currentPage === 1) {
@@ -56,7 +78,7 @@ $(function () {
                 } else {
                     $(button).click(() => {
                         currentPage = i + 1;
-                        displayTable();
+                        displayTable(rowData);
                     });
                 }
                 pagination.append(button);
@@ -65,7 +87,7 @@ $(function () {
             $(nextButton).click(() => {
                 if (currentPage < totalPages) {
                     currentPage++;
-                    displayTable();
+                    displayTable(rowData);
                 }
             });
             if (currentPage === totalPages) {
@@ -80,9 +102,13 @@ $(function () {
         entriesInfo.html(`Showing ${startIndex} to ${endIndex} of ${totalEntries} entries`);
     }
     $('#select').on('change', function () {
-        entriesPerPage = parseInt($(this).val());
-        displayTable();
-        updatePagination();
+        let newEntriesPerPage = parseInt($(this).val());
+        currentPage = Math.ceil((entriesPerPage*currentPage)/newEntriesPerPage);
+        entriesPerPage = newEntriesPerPage;
+        const searchTerm = searchInput.val();
+        const filteredData = filterData(searchTerm);
+        displayTable(filteredData);
+        updatePagination(filteredData);
     });
     let sortColumn = 0;
     let sortState = 'asc';
@@ -113,7 +139,9 @@ $(function () {
             return (sortState === 'asc') ? compareResult : -compareResult;
         });
         currentPage = 1;
-        displayTable();
+        const searchTerm = searchInput.val();
+        const filteredData = filterData(searchTerm);
+        displayTable(filteredData);
         $('th.sorting').removeClass('sorting-asc sorting-desc');
         $('th:eq(' + sortColumn + ')').addClass('sorting-' + sortState);
     });
